@@ -1,217 +1,289 @@
 const container = document.getElementById("questions-container");
-const submitButton = document.getElementById("submitButton");
-const titleExam = document.getElementById("exam-title");
-const descriptionExam = document.getElementById("exam-description");
-const addQuestionBtn = document.getElementById("add-question");
-const savedDraft = localStorage.getItem("examDraft") || null;
-let examDraft = {
-    title: "",
-    description: "",
-    questions: []
+const submitBtn = document.getElementById("submitButton");
+const nextBtn = document.getElementById("next-question");
+const prevBtn = document.getElementById("prev-question");
+const pageInfo = document.getElementById("page-info");
+
+const openModalBtn = document.getElementById("open-exam-modal-btn");
+const examModal = document.getElementById("exam-modal");
+const modalTitle = document.getElementById("modal-exam-title");
+const modalDesc = document.getElementById("modal-exam-description");
+const saveExamInfoBtn = document.getElementById("save-exam-info");
+
+let currentPage = 0;
+let examFormulated = JSON.parse(localStorage.getItem("examFormulated")) || false;
+let exams = JSON.parse(localStorage.getItem("examData")) || {
+  title: "",
+  description: "",
+  questions: [],
 };
 
-function saveDraft() {
-    localStorage.setItem("examDraft", JSON.stringify(examDraft));
+const saveToLocalStorage = () => localStorage.setItem("examData", JSON.stringify(exams));
+const saveFormulated = () => localStorage.setItem("examFormulated", "true");
+const showModal = () => (examModal.style.display = "flex");
+const hideModal = () => (examModal.style.display = "none");
+
+if (openModalBtn) openModalBtn.addEventListener("click", showModal);
+
+if (saveExamInfoBtn) {
+  saveExamInfoBtn.addEventListener("click", () => {
+    const title = modalTitle.value.trim();
+    const desc = modalDesc.value.trim();
+
+    if (!title || !desc) return alert("Complete título y descripción.");
+
+    exams.title = title;
+    exams.description = desc;
+    saveToLocalStorage();
+    examFormulated = true;
+    saveFormulated();
+    hideModal();
+  });
 }
 
-function saveFinalExam() {
-    localStorage.setItem('finalExam', JSON.stringify(examDraft));
-}
+if (!examFormulated) showModal();
 
-function createQuestionBlock(q = null) {
-    const questionBlock = document.createElement('div');
-    questionBlock.className = 'question-block';
+const updateOptionUI = (block, questionIndex) => {
+  const options = block.querySelectorAll(".option-container");
 
-    const questionText = q ? q.question : "";
-    const correctAnswer = q ? q.correctAnswer : "";
-    const options = q && q.options && q.options.length > 0 ? q.options : [""];
+  options.forEach((opt, i) => {
+    const input = opt.querySelector(".option-input");
+    input.placeholder = `Opción ${i + 1}`;
 
-    const optionsHTML = options.map((opt, index) => `
+    const radio = opt.querySelector(".correct-option-radio");
+    radio.name = `correct-option-${questionIndex}`;
 
-      <div class="option-container">
-        <input type="text" name="options" class="option-input input" value="${opt}" placeholder="Opción ${index + 1}" required>
-        ${index === options.length - 1 ? '<button type="button" class="add-option">+</button>' : ""}
-      </div>
+    const addBtn = opt.querySelector(".add-option");
+    const removeBtn = opt.querySelector(".remove-option");
 
-    `).join("");
-
-    questionBlock.innerHTML = `
-    <label>Pregunta:</label>
-    <input type="text" name="question-text" class="input" value="${questionText}" required>
-
-    <label>Respuesta Correcta:</label>
-    <input type="text" name="correct-answer" class="input" value="${correctAnswer}" required>
-
-    <label>Opciones:</label>
-    ${optionsHTML}
-  `;
-
-    return questionBlock;
-}
-
-if (savedDraft) {
-    examDraft = JSON.parse(savedDraft);
-    titleExam.value = examDraft.title;
-    descriptionExam.value = examDraft.description;
-    container.innerHTML = "";
-
-    if (examDraft.questions.length > 0) {
-        examDraft.questions.forEach(q => {
-            const block = createQuestionBlock(q);
-            container.appendChild(block);
-        });
+    if (i === options.length - 1) {
+      addBtn.style.display = "inline-block";
     } else {
-        container.appendChild(createQuestionBlock());
+      addBtn.style.display = "none";
     }
 
-} else {
-    if (!container.querySelector('.question-block')) {
-        container.appendChild(createQuestionBlock());
+    if (options.length === 1) {
+      removeBtn.style.display = "none";
+    } else {
+      removeBtn.style.display = "inline-block";
     }
-}
+  });
+};
 
-function updateDraftFromDOM() {
-    examDraft.title = titleExam.value.trim();
-    examDraft.description = descriptionExam.value.trim();
-    examDraft.questions = [];
+const createOptionElement = () => {
+  const div = document.createElement("div");
+  div.classList.add("option-container");
+  div.innerHTML = `
+        <input type="radio" class="correct-option-radio">
+        <input type="text" class="option-input input" required>
+        <button type="button" class="remove-option">-</button>
+        <button type="button" class="add-option">+</button>
+    `;
+  return div;
+};
 
-    const questionBlocks = document.querySelectorAll('.question-block');
+const createQuestionBlock = (questionData = null) => {
+  const block = document.createElement("div");
+  block.classList.add("question-block");
 
-    questionBlocks.forEach(block => {
-        const questionText = block.querySelector("input[name='question-text']").value.trim();
-        const correctAnswer = block.querySelector("input[name='correct-answer']").value.trim();
-        const optionsInputs = block.querySelectorAll(".option-input");
-        const options = Array.from(optionsInputs).map(input => input.value.trim());
+  block.innerHTML = `
+        <div class="question-head">
+            <label>Pregunta:</label>
+            <button type="button" class="delete-question"><i class="fas fa-trash-alt"></i></button>
+        </div>
+        <input type="text" name="question-text" class="input" required>
+        <label>Opciones:</label>
+        <div class="options-list"></div>
+    `;
 
-        examDraft.questions.push({
-            question: questionText || "",
-            correctAnswer: correctAnswer || "",
-            options: options.length > 0 ? options : [""]
-        });
+  const optionsList = block.querySelector(".options-list");
+  const questionText = block.querySelector('input[name="question-text"]');
+
+  if (questionData) {
+    questionText.value = questionData.title;
+    questionData.options.forEach((opt, i) => {
+      const option = createOptionElement();
+      option.querySelector(".option-input").value = opt;
+      if (i === questionData.correctAnswer) {
+        option.querySelector(".correct-option-radio").checked = true;
+      }
+      optionsList.appendChild(option);
     });
+  } else {
+    optionsList.appendChild(createOptionElement());
+  }
 
-    saveDraft();
-}
+  const currentIdx = container.querySelectorAll(".question-block").length;
+  updateOptionUI(block, currentIdx);
 
-function validationExam(block) {
-    const questionText = block.querySelector("input[name='question-text']").value.trim();
-    const correctAnswer = block.querySelector("input[name='correct-answer']").value.trim();
-    const options = Array.from(block.querySelectorAll(".option-input")).map(input => input.value.trim()).filter(opt => opt !== "");
+  return block;
+};
 
-    if (!titleExam.value.trim() || !descriptionExam.value.trim()) {
-        alert("Por favor, completa el título y la descripción del examen.");
-        return false;
-    }
+const showQuestion = (index) => {
+  const questions = container.querySelectorAll(".question-block");
 
-    if (titleExam.value.trim().length < 15) {
-        alert("El título debe tener mínimo 15 caracteres.");
-        return false;
-    }
+  if (questions.length === 0) {
+    pageInfo.textContent = "0 de 0";
+    return;
+  }
 
-    if (descriptionExam.value.trim().length < 30) {
-        alert("La descripción debe tener mínimo 30 caracteres.");
-        return false;
-    }
+  questions.forEach(
+    (q, i) => (q.style.display = i === index ? "block" : "none")
+  );
+  currentPage = index;
+  pageInfo.textContent = `Pregunta ${index + 1} de ${questions.length}`;
 
-    if (!questionText) {
-        alert("Indica la pregunta primero.");
-        return false;
-    }
+  prevBtn.disabled = index === 0;
+};
 
-    if (questionText.length < 5) {
-        alert("La pregunta debe tener al menos 5 caracteres.");
-        return false;
-    }
+const saveCurrentQuestion = () => {
+  const currentBlock = container.querySelectorAll(".question-block")[currentPage];
+  if (!currentBlock) return;
 
-    if (!correctAnswer) {
-        alert("Debes indicar la respuesta correcta.");
-        return false;
-    }
+  const title = currentBlock.querySelector('input[name="question-text"]').value.trim();
+  const options = Array.from(
+    currentBlock.querySelectorAll(".option-input")
+  ).map((o) => o.value.trim());
 
-    return { correctAnswer, options };
-}
+  const correctAnswer = Array.from(
+    currentBlock.querySelectorAll(".correct-option-radio")
+  ).findIndex((r) => r.checked);
 
-function validationExamFinish(block) {
-    const data = validationExam(block);
-    if (!data) return false;
-    const { correctAnswer, options } = data;
+  exams.questions[currentPage] = { title, options, correctAnswer };
+  saveToLocalStorage();
+};
 
-    if (options.length < 2) {
-        alert("Debes agregar al menos dos opciones.");
-        return false;
-    }
+const validateExamInfo = () => exams.title && exams.description;
 
-    if (!options.includes(correctAnswer)) {
-        alert("La respuesta correcta debe estar entre las opciones.");
-        return false;
-    }
+const validateQuestion = (block) => {
+  const title = block.querySelector('input[name="question-text"]').value.trim();
+  const options = Array.from(block.querySelectorAll(".option-input")).map((o) =>
+    o.value.trim()
+  );
+  const correctAnswer = Array.from(
+    block.querySelectorAll(".correct-option-radio")
+  ).some((r) => r.checked);
 
-    return true;
-}
+  if (!title) { alert("Debe escribir la pregunta."); return false; }
+  if (options.length < 2) { alert("Debe agregar al menos 2 opciones."); return false; }
+  if (options.some((o) => !o)) { alert("Complete todas las opciones."); return false; }
+  if (!correctAnswer) { alert("Seleccione una respuesta correcta."); return false; }
 
-submitButton.addEventListener("click", (e) => {
-    e.preventDefault();
-    const checked = validationExamFinish(container.querySelector('.question-block:last-child'));
-    if (checked === false) return;
+  return true;
+};
 
-    saveFinalExam();
-    alert("✅ Examen final guardado correctamente.");
-    localStorage.removeItem("examDraft");
-    container.innerHTML = "";
-    titleExam.value = "";
-    descriptionExam.value = "";
+document.addEventListener("click", (e) => {
+  const block = e.target.closest(".question-block");
+  if (!block) return;
+
+  const optionsList = block.querySelector(".options-list");
+  const allBlocks = Array.from(container.querySelectorAll(".question-block"));
+  const questionIndex = allBlocks.indexOf(block);
+
+  if (e.target.closest(".add-option")) {
+    const questionInput = block.querySelector('input[name="question-text"]');
+    const currentOptions = block.querySelectorAll(".option-container");
+    const lastOptionInput = currentOptions[currentOptions.length - 1].querySelector(".option-input");
+
+    if (!questionInput.value.trim()) return alert("Escriba la pregunta antes de agregar opciones.");
+    if (!lastOptionInput.value.trim()) return alert("Complete la opción anterior primero.");
+
+    optionsList.appendChild(createOptionElement());
+    updateOptionUI(block, questionIndex);
+  }
+
+  if (e.target.closest(".remove-option")) {
+    const option = e.target.closest(".option-container");
+    const allOptions = block.querySelectorAll(".option-container");
+
+    if (allOptions.length <= 1) return;
+
+    option.remove();
+    updateOptionUI(block, questionIndex);
+  }
+
+  if (e.target.closest(".delete-question")) {
+    if (container.querySelectorAll(".question-block").length <= 1)
+      return alert("No se puede eliminar la última pregunta.");
+
+    if (!confirm("¿Desea eliminar esta pregunta?")) return;
+
+    block.remove();
+    exams.questions.splice(questionIndex, 1);
+    saveToLocalStorage();
+
+    const newTotal = container.querySelectorAll(".question-block").length;
+    const newPage = (currentPage >= newTotal) ? newTotal - 1 : currentPage;
+
+    showQuestion(newPage);
+  }
+});
+
+nextBtn.addEventListener("click", () => {
+  const block = container.querySelectorAll(".question-block")[currentPage];
+
+  if (!validateExamInfo()) return alert("Falta información del examen (Título/Descripción).");
+  if (!validateQuestion(block)) return;
+
+  saveCurrentQuestion();
+
+  const questions = container.querySelectorAll(".question-block");
+  if (currentPage === questions.length - 1) {
     const newBlock = createQuestionBlock();
     container.appendChild(newBlock);
+  }
+  showQuestion(currentPage + 1);
 });
 
-container.addEventListener('click', (e) => {
-    if (!e.target.classList.contains('add-option')) return;
-    const checked = validationExam(container.querySelector('.question-block:last-child'));
-    if (checked === false) return;
+prevBtn.addEventListener("click", () => {
+  saveCurrentQuestion();
+  if (currentPage > 0) {
+    showQuestion(currentPage - 1);
+  }
+});
 
-    const currentQuestionBlock = e.target.closest('.question-block');
-    const currentOptions = currentQuestionBlock.querySelectorAll('.option-input');
-    const lastOptionValue = currentOptions[currentOptions.length - 1].value.trim();
-    if (!lastOptionValue) {
-        alert("Escribe algo en la opción antes de agregar.");
-        return;
+submitBtn.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (!validateExamInfo()) return alert("Complete información del examen.");
+
+  const allQuestions = container.querySelectorAll(".question-block");
+
+  for (let i = 0; i < allQuestions.length; i++) {
+    const block = allQuestions[i];
+    if (!validateQuestion(block)) {
+      showQuestion(i);
+      return;
     }
-    const nextOptionNumber = currentOptions.length + 1;
+    currentPage = i;
+    saveCurrentQuestion();
+  }
 
-    const optionDiv = document.createElement('div');
-    optionDiv.className = 'option-container';
+  exams.questions = exams.questions.filter(
+    (q) => q.title && q.options.length >= 2
+  );
 
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.name = 'options';
-    input.className = 'option-input input';
-    input.placeholder = `Opción ${nextOptionNumber}`;
-    input.required = true;
+  saveToLocalStorage();
+  localStorage.setItem("examSaved", "true");
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'add-option';
-    btn.textContent = '+';
-
-    optionDiv.appendChild(input);
-    optionDiv.appendChild(btn);
-
-    currentQuestionBlock.appendChild(optionDiv);
-    e.target.remove();
-
-    updateDraftFromDOM();
+  alert("¡Examen guardado correctamente!");
+  window.location.replace("../index.html");
 });
 
-addQuestionBtn.addEventListener('click', () => {
-    const checked = validationExamFinish(container.querySelector('.question-block:last-child'));
-    if (checked === false) return;
-    const newBlock = createQuestionBlock();
-    container.appendChild(newBlock);
-    updateDraftFromDOM();
-});
+const init = () => {
+  container.innerHTML = "";
+  modalTitle.value = exams.title || "";
+  modalDesc.value = exams.description || "";
 
-document.addEventListener('input', (e) => {
-    if (e.target.classList.contains('input')) {
-        updateDraftFromDOM();
-    }
-});
+  if (!exams.questions || exams.questions.length === 0) {
+    container.appendChild(createQuestionBlock());
+  } else {
+    exams.questions.forEach((q) =>
+      container.appendChild(createQuestionBlock(q))
+    );
+  }
+
+  currentPage = 0;
+  showQuestion(currentPage);
+};
+
+init();

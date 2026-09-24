@@ -1,37 +1,47 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Realizar Examen</title>
-  <link rel="icon" type="image/x-icon" href="../favicon.ico">
-  <link rel="stylesheet" href="../styles/doExam.css">
-</head>
-<body>
-  <div class="container">
-    <div class="exam-header">
-      <h1 id="exam-title"></h1>
-      <p class="info-exam"></p>
-    </div>
-    <form id="exam-form">
-      <div id="questions-container"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Realizar Examen</title>
+    <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+    <link rel="stylesheet" href="../styles/doExam.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="exam-header">
+        <h1 id="exam-title">Examen</h1>
+        <p class="info-exam">Descripción del examen</p>
+      </header>
+      
+      <form id="exam-form" novalidate>
+        <section id="questions-container"></section>
+        
+        <div class="button-group">
+          <button
+            type="button"
+            class="back-btn"
+            onclick="window.location.href='../index.html'"
+          >
+            Volver al inicio
+          </button>
+          <button type="submit" class="submit-btn">Enviar Examen</button>
+        </div>
+      </form>
+    </main>
 
-      <div class="button-group">
-        <button onclick="window.location.href='../index.html'" class="back-btn">Volver al inicio</button>
-        <button type="submit" class="submit-btn">Enviar Examen</button>
-      </div>
-    </form>
-  </div>
-  <div id="result-modal" class="modal">
-    <div class="modal-content">
-      <h2 id="modal-message"></h2>
-      <p id="modal-estado"></p>
-      <div class="modal-actions">
-        <button id="retry-btn" class="btn retry">Repetir examen</button>
-        <button id="back-btn" class="btn back">Volver al inicio</button>
+    <div id="result-modal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-icon">🎯</div>
+        <h2 id="modal-message">Tu calificación</h2>
+        <p id="modal-estado">Estado del examen</p>
+        <div class="modal-actions">
+          <button id="retry-btn" class="btn retry">Repetir examen</button>
+          <button id="back-btn" class="btn back">Volver al inicio</button>
+        </div>
       </div>
     </div>
-  </div>
-  <script src="../scripts/doExam.js"></script>
-</body>
+
+    <script src="../scripts/doExam.js"></script>
+  </body>
 </html>
